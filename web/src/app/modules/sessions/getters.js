@@ -14,17 +14,9 @@ See the License for the specific language governing permissions and
 limitations under the License.
 */
 
-var { toImmutable } = require('nuclear-js');
+var moment =  require('moment');
 var reactor = require('app/reactor');
 var cfg = require('app/config');
-
-const sessionsByServer = (serverId) => [['tlpt_sessions'], (sessions) =>{
-  return sessions.valueSeq().filter(item=>{
-    var parties = item.get('parties') || toImmutable([]);
-    var hasServer = parties.find(item2=> item2.get('server_id') === serverId);
-    return hasServer;
-  }).toList();
-}]
 
 const sessionsView = [['tlpt_sessions'], (sessions) =>{
   return sessions.valueSeq().map(createView).toJS();
@@ -60,19 +52,28 @@ function createView(session){
   var parties = reactor.evaluate(partiesBySessionId(sid));
 
   if(parties.length > 0){
-    serverIp = parties[0].serverIp;    
+    serverIp = parties[0].serverIp;
   }
 
+  let created = new Date(session.get('created'));
+  let lastActive = new Date(session.get('last_active'));
+  let duration = moment(created).diff(lastActive);
+
   return {
-    sid: sid,
-    sessionUrl: cfg.getActiveSessionRouteUrl(sid),
+    parties,
+    sid,
+    created,
+    lastActive,
+    duration,
     serverIp,
+    stored: session.get('stored'),
     serverId: session.get('server_id'),
+    clientIp: session.get('clientIp'),
+    nodeIp: session.get('nodeIp'),
     active: session.get('active'),
-    created: session.get('created'),
-    lastActive: session.get('last_active'),
+    user: session.get('user'),
     login: session.get('login'),
-    parties: parties,
+    sessionUrl: cfg.getCurrentSessionRouteUrl(sid),
     cols: session.getIn(['terminal_params', 'w']),
     rows: session.getIn(['terminal_params', 'h'])
   }
@@ -80,7 +81,6 @@ function createView(session){
 
 export default {
   partiesBySessionId,
-  sessionsByServer,
   sessionsView,
   sessionViewById,
   createView,

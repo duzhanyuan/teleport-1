@@ -19,12 +19,12 @@ package services
 import (
 	"encoding/json"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
 	"github.com/gravitational/teleport/lib/utils"
 
-	"github.com/gravitational/configure/cstrings"
 	"github.com/gravitational/trace"
 )
 
@@ -95,8 +95,8 @@ type ReverseTunnel struct {
 
 // Check returns nil if all parameters are good, error otherwise
 func (r *ReverseTunnel) Check() error {
-	if !cstrings.IsValidDomainName(r.DomainName) {
-		return trace.BadParameter("Reverse tunnel validation error: '%v' is not a valid FQDN", r.DomainName)
+	if strings.TrimSpace(r.DomainName) == "" {
+		return trace.BadParameter("Reverse tunnel validation error: empty domain name")
 	}
 
 	if len(r.DialAddrs) == 0 {
@@ -173,5 +173,6 @@ func (s *Server) LabelsString() string {
 	for key, val := range s.CmdLabels {
 		labels = append(labels, fmt.Sprintf("%s=%s", key, val.Result))
 	}
+	sort.Strings(labels)
 	return strings.Join(labels, ",")
 }

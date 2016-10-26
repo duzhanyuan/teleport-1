@@ -1,10 +1,12 @@
 # Gravitational Teleport
 
-|Project Links|
-|---|
-| [Teleport Website](http://gravitational.com/teleport)  |
-| [Documentation](http://gravitational.com/teleport/docs/quickstart/)  |
-| [Demo Video](https://www.youtube.com/watch?v=7eVAC2U8OtM) |
+|Project Links| Description
+|---|----
+| [Teleport Website](http://gravitational.com/teleport)  | The official website of the project |
+| [Documentation](http://gravitational.com/teleport/docs/quickstart/)  | Admin guide, user manual and more |
+| [Demo Video](https://www.youtube.com/watch?v=7eVAC2U8OtM) | 3-minute video overview of the UI. |
+| [Teleconsole](http://www.teleconsole.com) | The free service to "invite" SSH clients behind NAT, built on top of Teleport |
+| [Blog](http://blog.gravitational.com) | Our blog where we publish Teleport news |
 
 ## Introduction
 
@@ -36,7 +38,13 @@ teleport start
 
 You need to have Golang `v1.7` or newer. 
 
-Clone this repository into `$GOPATH/gravitational/teleport` and run `make`. 
+Run 
+
+1. `go get github.com/gravitational/teleport`
+2. `cd $GOPATH/src/github.com/gravitational/teleport`
+3. `make`
+
+If the build was successful the binaries are here: `$GOPATH/src/github.com/gravitational/teleport/build`
 
 You'll have to create `/var/lib/teleport` directory and then you can start 
 Teleport as a single-node cluster in development mode: `build/teleport start -d`

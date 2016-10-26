@@ -20,11 +20,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"time"
-
-	"github.com/gravitational/configure/cstrings"
 
 	"github.com/gravitational/teleport"
 	"github.com/gravitational/teleport/lib/auth"
@@ -65,7 +64,9 @@ type Server interface {
 	// GetSites returns a list of connected remote sites
 	GetSites() []RemoteSite
 	// GetSite returns remote site this node belongs to
-	GetSite(name string) (RemoteSite, error)
+	GetSite(domainName string) (RemoteSite, error)
+	// RemoveSite removes the site with the specified name from the list of connected sites
+	RemoveSite(domainName string) error
 	// Start starts server
 	Start() error
 	// CLose closes server's socket
@@ -77,7 +78,7 @@ type Server interface {
 type server struct {
 	sync.RWMutex
 
-	localAuth       auth.ClientI
+	localAuth       auth.AccessPoint
 	hostCertChecker ssh.CertChecker
 	userCertChecker ssh.CertChecker
 	l               net.Listener
@@ -113,14 +114,15 @@ func SetLimiter(limiter *limiter.Limiter) ServerOption {
 	}
 }
 
-// NewServer returns an unstarted server
+// NewServer creates and returns a reverse tunnel server which is fully
+// initialized but hasn't been started yet
 func NewServer(addr utils.NetAddr, hostSigners []ssh.Signer,
-	clt auth.ClientI, opts ...ServerOption) (Server, error) {
+	authAPI auth.AccessPoint, opts ...ServerOption) (Server, error) {
 
 	srv := &server{
 		directSites: []*directSite{},
 		tunnelSites: []*tunnelSite{},
-		localAuth:   clt,
+		localAuth:   authAPI,
 	}
 	var err error
 	srv.limiter, err = limiter.NewLimiter(limiter.LimiterConfig{})
@@ -171,9 +173,15 @@ func (s *server) Close() error {
 }
 
 func (s *server) HandleNewChan(conn net.Conn, sconn *ssh.ServerConn, nch ssh.NewChannel) {
-	if nch.ChannelType() != chanHeartbeat {
+	ct := nch.ChannelType()
+	if ct != chanHeartbeat {
 		msg := fmt.Sprintf("reversetunnel received unknown channel request %v from %v",
 			nch.ChannelType(), sconn)
+		// if someone is trying to open a new SSH session by talking to a reverse tunnel,
+		// they're most likely using the wrong port number. Lets give them the explicit hint:
+		if ct == "session" {
+			msg = "Cannot open new SSH session on reverse tunnel. Are you connecting to the right port?"
+		}
 		log.Warningf(msg)
 		nch.Reject(ssh.ConnectionFailed, msg)
 		return
@@ -339,8 +347,8 @@ func (s *server) keyAuth(conn ssh.ConnMetadata, key ssh.PublicKey) (*ssh.Permiss
 
 func (s *server) upsertSite(conn net.Conn, sshConn *ssh.ServerConn) (*tunnelSite, *remoteConn, error) {
 	domainName := sshConn.Permissions.Extensions[extAuthority]
-	if !cstrings.IsValidDomainName(domainName) {
-		return nil, nil, trace.BadParameter("Cannot create reverse tunnel: '%v' is not a valid FQDN", domainName)
+	if strings.TrimSpace(domainName) == "" {
+		return nil, nil, trace.BadParameter("Cannot create reverse tunnel: empty domain name")
 	}
 
 	s.Lock()
@@ -395,13 +403,30 @@ func (s *server) GetSite(domainName string) (RemoteSite, error) {
 			return s.tunnelSites[i], nil
 		}
 	}
-
 	for i := range s.directSites {
 		if s.directSites[i].domainName == domainName {
 			return s.directSites[i], nil
 		}
 	}
 	return nil, trace.NotFound("site '%v' not found", domainName)
+}
+
+func (s *server) RemoveSite(domainName string) error {
+	s.Lock()
+	defer s.Unlock()
+	for i := range s.tunnelSites {
+		if s.tunnelSites[i].domainName == domainName {
+			s.tunnelSites = append(s.tunnelSites[:i], s.tunnelSites[i+1:]...)
+			return nil
+		}
+	}
+	for i := range s.directSites {
+		if s.directSites[i].domainName == domainName {
+			s.directSites = append(s.directSites[:i], s.directSites[i+1:]...)
+			return nil
+		}
+	}
+	return trace.NotFound("site '%v' not found", domainName)
 }
 
 type remoteConn struct {

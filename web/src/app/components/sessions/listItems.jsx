@@ -33,14 +33,8 @@ const DateCreatedCell = ({ rowIndex, data, ...props }) => {
 };
 
 const DurationCell = ({ rowIndex, data, ...props }) => {
-  let created = data[rowIndex].created;
-  let lastActive = data[rowIndex].lastActive;
-
-  let end = moment(created);
-  let now = moment(lastActive);
-  let duration = moment.duration(now.diff(end));
-  let displayDate = duration.humanize();
-
+  let { duration } = data[rowIndex];
+  let displayDate = moment.duration(duration).humanize();
   return (
     <Cell {...props}>
       { displayDate }
@@ -48,10 +42,11 @@ const DurationCell = ({ rowIndex, data, ...props }) => {
   )
 };
 
-const SingleUserCell = ({ rowIndex, data, ...props }) => {
+const SingleUserCell = ({ rowIndex, data, ...props }) => {  
+  let { user } = data[rowIndex];
   return (
     <Cell {...props}>
-      <span className="grv-sessions-user label label-default">{data[rowIndex].login}</span>
+      <span className="grv-sessions-user label label-default">{user}</span>
     </Cell>
   )
 };

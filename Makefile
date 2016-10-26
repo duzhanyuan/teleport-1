@@ -2,7 +2,7 @@
 # Naming convention:
 #	for stable releases we use "1.0.0" format
 #   for pre-releases, we use   "1.0.0-beta.2" format
-VERSION=1.1.0
+VERSION=1.2.0
 
 # These are standard autotools variables, don't change them please
 BUILDDIR ?= build
@@ -10,7 +10,6 @@ BINDIR ?= /usr/local/bin
 DATADIR ?= /usr/local/share/teleport
 ADDFLAGS ?=
 
-GO15VENDOREXPERIMENT := 1
 PWD ?= $(shell pwd)
 ETCD_CERTS := $(realpath fixtures/certs)
 ETCD_FLAGS := TELEPORT_TEST_ETCD_CONFIG='{"nodes": ["https://localhost:4001"], "key":"/teleport/test", "tls_key_file": "$(ETCD_CERTS)/proxy1-key.pem", "tls_cert_file": "$(ETCD_CERTS)/proxy1.pem", "tls_ca_file": "$(ETCD_CERTS)/ca.pem"}'
@@ -185,3 +184,7 @@ start-test-etcd:
 remove-temp-files:
 	find . -name flymake_* -delete
 
+# Dockerized build: usefule for making Linux releases on OSX
+.PHONY:docker
+docker:
+	make -C build.assets teleport

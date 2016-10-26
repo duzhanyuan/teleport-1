@@ -202,6 +202,10 @@ func (s *AuthTunnel) HandleNewChan(_ net.Conn, sconn *ssh.ServerConn, nch ssh.Ne
 			return
 		}
 		go s.handleWebAgentRequest(sconn, ch)
+
+	case "session":
+		nch.Reject(ssh.UnknownChannelType,
+			"Cannot open new SSH session on the auth server. Are you connecting to the right port?")
 	default:
 		nch.Reject(ssh.UnknownChannelType, fmt.Sprintf(
 			"unknown channel type: %v", cht))
@@ -591,7 +595,7 @@ func NewTunClient(purpose string,
 	if tc.addrStorage != nil {
 		cachedAuthServers, err := tc.addrStorage.GetAddresses()
 		if err != nil {
-			log.Warningf("unable to load the auth server cache: %v", err)
+			log.Infof("unable to load the auth server cache: %v", err)
 		} else {
 			tc.setAuthServers(cachedAuthServers)
 		}
@@ -644,9 +648,10 @@ func (c *TunClient) GetAgent() (AgentCloser, error) {
 	return agentCloser, nil
 }
 
-// Dial dials to Auth server's HTTP API over SSH tunnel
+// Dial dials to Auth server's HTTP API over SSH tunnel.
 func (c *TunClient) Dial(network, address string) (net.Conn, error) {
 	log.Debugf("TunClient[%s].Dial()", c.purpose)
+
 	client, err := c.getClient()
 	if err != nil {
 		return nil, trace.Wrap(err)
@@ -777,10 +782,11 @@ func (c *TunClient) getClient() (client *ssh.Client, err error) {
 
 func (c *TunClient) dialAuthServer(authServer utils.NetAddr) (sshClient *ssh.Client, err error) {
 	config := &ssh.ClientConfig{
-		User: c.user,
-		Auth: c.authMethods,
+		User:    c.user,
+		Auth:    c.authMethods,
+		Timeout: defaults.DefaultDialTimeout,
 	}
-	const dialRetryTimes = 5
+	const dialRetryTimes = 3
 	for attempt := 0; attempt < dialRetryTimes; attempt++ {
 		log.Debugf("tunClient.Dial(to=%v, attempt=%d)", authServer.Addr, attempt+1)
 		sshClient, err = ssh.Dial(authServer.AddrNetwork, authServer.Addr, config)
